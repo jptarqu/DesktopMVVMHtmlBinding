@@ -1,0 +1,158 @@
+﻿<#@ template language="C#" hostspecific="True" debug="true"
+#>
+
+
+<#@ assembly name="System.Core"
+#><#@ assembly name="System.Data.Linq"
+#>
+<#@ assembly name="System.ComponentModel"
+#><#@ assembly name="EnvDTE"
+#><#@ assembly name="System.Xml"
+#><#@ assembly name="System.Xml.Linq"
+#><#@ import namespace="System"
+#><#@ import namespace="System.Collections.Generic"
+#><#@ import namespace="System.Data.Linq"
+#><#@ import namespace="System.Data.Linq.Mapping"
+#><#@ import namespace="System.IO"
+#><#@ import namespace="System.Linq"
+#><#@ import namespace="System.Reflection"
+#><#@ import namespace="System.Text"
+#><#@ import namespace="System.Xml.Linq"
+#><#@ import namespace="System.ComponentModel"
+#>
+<#@ import namespace="EnvDTE" #>
+<#@ import namespace="System.Diagnostics" #>
+<#@ import namespace="Microsoft.VisualStudio.TextTemplating"
+#>
+
+<#@ include file="T4Toolbox.tt" #>
+<#@ output extension=".js"
+#>
+<#   
+            var hostServiceProvider = (IServiceProvider) Host;
+	EnvDTE.DTE dte  = (EnvDTE.DTE) hostServiceProvider.GetService(typeof(EnvDTE.DTE));
+    var core_namespace = "HTMLBindingTest.ViewModels";
+	var model_classes = FindClasses(core_namespace);//, dte).Where(n => !n.EndsWith("Repository") );
+   //template code - you get IntelliSense here
+   //string[] model_classes = new String[] {"CommunityPresident"};
+  	
+#>
+
+var observed_objs = [];
+
+function InitBindings()
+{
+    ko.applyBindings(observed_objs[0]);
+}
+
+function NotifyNETViewModel(obj_id, new_value)
+{
+    
+}
+
+    <# foreach (var model_class in model_classes)
+    { #> 
+    var <#= model_class.Name #>  = function (obj_id) {
+    <# 
+        var simple_props = new LinkedList<string>();
+        var list_props = new LinkedList<string>();
+
+        foreach (CodeElement class_member in model_class.Members)
+        { 
+	   
+            if (class_member is CodeProperty) {
+                var prop_info = class_member as CodeProperty;
+                var type_name = prop_info.Type.AsString;
+                if (type_name.Contains("ObservableCollection"))
+                {
+                        list_props.AddLast(class_member.Name);
+#> 
+		        this.<#= class_member.Name #> = ko.observableArray(); 
+	         <#                } 
+                else{
+                    simple_props.AddLast(class_member.Name);
+ #> 
+		        this.<#= class_member.Name #> = ko.observable();
+                this.<#= class_member.Name #>.subscribe(function(newValue) {
+                    NotifyNETViewModel( obj_id, newValue);
+                });
+	<#                } //end if list #>
+		
+	<#            } //end if property #>
+  <#        } //end foreach prop
+        #>
+        }
+        
+        var Create_<#= model_class.Name #> = function(new_id) { 
+                observed_objs[new_id] = new <#= model_class.Name #>(); 
+            }
+<# foreach (string prop in simple_props)  {   #> 
+        var Set_<#= model_class.Name #>_<#= prop #> = function(obj_id, new_value) { observed_objs[obj_id].<#= prop #>(new_value); }
+<# } //end foreach prop simple_props #>
+
+<# foreach (string prop in list_props)  {   #> 
+        var Add_<#= model_class.Name #>_<#= prop #> = function(obj_id, inserted_obj_id) { observed_objs[obj_id].<#= prop #>.push(inserted_obj_id); }
+<# } //end foreach prop simple_props #>
+
+    <# 
+} //end foreach model_class
+ #>
+
+<#+  
+  
+
+        private List<CodeClass> FindClasses(string nameSpace)
+{
+    List<CodeClass> result=new List<CodeClass>();
+    FindClasses(GetProject().CodeModel.CodeElements,nameSpace,result,false);
+    return result;
+
+}
+
+
+private void FindClasses(CodeElements elements,string searchNamespace,List<CodeClass> result,bool isNamespaceOk)
+{
+    if (elements==null)return;
+    foreach (CodeElement element in elements)
+    {       
+        if(element is CodeNamespace)
+        {
+            CodeNamespace ns = element as CodeNamespace;
+            if(ns != null)
+            {
+                if (ns.FullName == searchNamespace)
+                    FindClasses(ns.Members, searchNamespace,result,true);
+                else
+                    FindClasses(ns.Members, searchNamespace,result,false);
+            }
+        }
+        else if(element is CodeClass && isNamespaceOk)
+        {
+            CodeClass c = element as CodeClass;
+            if (c != null)
+            {
+                //if(c.FullName.Contains(className))
+                    result.Add(c);
+
+                FindClasses(c.Members, searchNamespace,result,true);
+            }
+
+        }
+    }
+}
+
+
+private Project GetProject()
+{
+    // Get DTE
+    var dte = (DTE)TransformationContext.Current.GetService(typeof(DTE));
+
+    // Get ProjectItem representing the template file
+    ProjectItem projectItem = dte.Solution.FindProjectItem(TransformationContext.Current.Host.TemplateFile);
+
+    // Get the Project of the template file
+    Project project = projectItem.ContainingProject;
+
+    return project;
+}
+#>
