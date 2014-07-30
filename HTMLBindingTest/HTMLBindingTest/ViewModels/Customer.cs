@@ -32,7 +32,7 @@ namespace HTMLBindingTest.ViewModels
             get { return _CustNum; }
             set
             {
-                if (_CustNum != value)
+                if (_CustNum != value) //VERY IMPORTANT TO CHECK IF THE BVALUE CHANGED, OTHERWISE YOU WOULD GET AN INFINITE CHANGE NOTIFICATION BEHAVIOUR WITH JS
                 {
                     _CustNum = value;
                     RaisePropertyChanged(() => CustNum);

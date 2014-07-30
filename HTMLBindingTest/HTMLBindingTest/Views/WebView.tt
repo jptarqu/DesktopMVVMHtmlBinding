@@ -45,14 +45,19 @@ function InitBindings()
     ko.applyBindings(observed_objs[0]);
 }
 
-function NotifyNETViewModel(obj_id, new_value)
+
+function NotifyNETViewModel(obj_id, prop_name, new_value)
 {
-    
+    if (window.external)
+    {
+        window.external.OnNewValue(obj_id, prop_name, new_value);
+    }
 }
 
     <# foreach (var model_class in model_classes)
     { #> 
     var <#= model_class.Name #>  = function (obj_id) {
+        this.__obj_id = obj_id;
     <# 
         var simple_props = new LinkedList<string>();
         var list_props = new LinkedList<string>();
@@ -73,8 +78,12 @@ function NotifyNETViewModel(obj_id, new_value)
                     simple_props.AddLast(class_member.Name);
  #> 
 		        this.<#= class_member.Name #> = ko.observable();
+		        //this.__netvalue_<#= class_member.Name #> = null;
                 this.<#= class_member.Name #>.subscribe(function(newValue) {
-                    NotifyNETViewModel( obj_id, newValue);
+                    //if (this.__netvalue_<#= class_member.Name #> != newValue) WE LEAVE THE CHNAGE CHECK TO .NET
+                    //{
+                        NotifyNETViewModel( obj_id, '<#= class_member.Name #>' , newValue);
+                    //}
                 });
 	<#                } //end if list #>
 		
@@ -83,15 +92,18 @@ function NotifyNETViewModel(obj_id, new_value)
         #>
         }
         
-        var Create_<#= model_class.Name #> = function(new_id) { 
-                observed_objs[new_id] = new <#= model_class.Name #>(); 
+        function Create_<#= model_class.Name #>(new_id) { 
+                observed_objs[new_id] = new <#= model_class.Name #>(new_id); 
             }
 <# foreach (string prop in simple_props)  {   #> 
-        var Set_<#= model_class.Name #>_<#= prop #> = function(obj_id, new_value) { observed_objs[obj_id].<#= prop #>(new_value); }
+        function Set_<#= model_class.Name #>_<#= prop #>(obj_id, new_value) { 
+            //observed_objs[obj_id].__netvalue_<#= prop #> = new_value;
+            observed_objs[obj_id].<#= prop #>(new_value); 
+            }
 <# } //end foreach prop simple_props #>
 
 <# foreach (string prop in list_props)  {   #> 
-        var Add_<#= model_class.Name #>_<#= prop #> = function(obj_id, inserted_obj_id) { observed_objs[obj_id].<#= prop #>.push(inserted_obj_id); }
+        function Add_<#= model_class.Name #>_<#= prop #>(obj_id, inserted_obj_id) { observed_objs[obj_id].<#= prop #>.push(inserted_obj_id); }
 <# } //end foreach prop simple_props #>
 
     <# 

@@ -60,7 +60,7 @@ namespace HTMLBindingTest.Converters
 
         }
 
-        public void OnNewValue(int obj_id, object new_value)
+        public void OnNewValue(int obj_id, string prop_name, object new_value)
         {
 
         }
